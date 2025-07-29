@@ -1,37 +1,47 @@
-const prisma = require('../prisma/prisma')
-const bcrypt = require('bcrypt')
-const jwt = require('jsonwebtoken')
+const prisma = require('../prisma/prisma');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 exports.register = async (req, res) => {
   try {
     const { name, surname, email, password, phone } = req.body;
-//  ตรวจสอบว่า field ไม่ว่าง
+
+    // ตรวจสอบว่าข้อมูลครบ
     if (!name || !surname || !email || !password || !phone) {
       return res.status(400).json({ message: 'กรอกข้อมูลให้ครบ' });
     }
-     //  ตรวจสอบว่า email มี @
+
+    // ตรวจสอบรูปแบบ email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: 'รูปแบบอีเมลไม่ถูกต้อง' });
     }
-    //  ตรวจสอบ password: มากกว่า 8 ตัวและมีตัวอักษร
+
+    // ตรวจสอบความยาวและตัวอักษร password
     if (password.length < 8 || !/[a-zA-Z]/.test(password)) {
-      return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร และมีตัวอักษรอย่างน้อย 1 ตัว' });
+      return res.status(400).json({
+        message: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร และมีตัวอักษรอย่างน้อย 1 ตัว',
+      });
     }
 
-//  เช็คว่ามี email ซ้ำหรือยัง
-    const existingGmail = await prisma.user.findUnique({ where: { email } });
-    if (existingGmail) {
+    // เช็ค email ซ้ำ
+    const existingEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingEmail) {
       return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
     }
-//  เช็คว่ามี phone ซ้ำหรือยัง
-    const existingPhone = await prisma.user.findUnique({ where: { phone } })
+
+    // เช็ค phone ซ้ำ
+    const existingPhone = await prisma.user.findUnique({ where: { phone } });
     if (existingPhone) {
-        return res.status(400).json({ message: 'เบอร์นี้ถูกใช้งานแล้ว '})
+      return res.status(400).json({ message: 'เบอร์นี้ถูกใช้งานแล้ว' });
     }
-//  Hash รหัสผ่าน
+
+    // เข้ารหัส password
     const hashedPassword = await bcrypt.hash(password, 10);
-//  บันทึกผู้ใช้ลง database
+
+   
+
+    // สร้างผู้ใช้ในฐานข้อมูล
     const user = await prisma.user.create({
       data: {
         name,
@@ -40,12 +50,23 @@ exports.register = async (req, res) => {
         password: hashedPassword,
         phone,
       },
+      select: {
+        id: true,
+        name: true,
+        surname: true,
+        email: true,
+        phone: true,
+        role: true,
+      },
     });
 
-    res.status(201).json({ message: 'สมัครสมาชิกสำเร็จ', user });
+    return res.status(201).json({
+      message: 'สมัครสมาชิกสำเร็จแล้วเข้าสู่ระบบเลย',
+      user,
+    });
   } catch (error) {
-    console.error('Register Error:', error);
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดที่ server' });
+    console.error('สมัครสมาชิกไม่สำเร็จ', error);
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดที่ server' });
   }
 };
 
@@ -53,43 +74,50 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // ตรวจสอบว่ามี email นี้หรือไม่
+    // ตรวจสอบข้อมูลครบ
+    if (!email || !password) {
+      return res.status(400).json({ message: 'กรุณากรอกอีเมลและรหัสผ่าน' });
+    }
+
+    // หา user ด้วย email
     const user = await prisma.user.findUnique({
-      where: { email: email },
+      where: { email },
     });
 
     if (!user) {
-      return res.status(400).json({ message: "ไม่พบผู้ใช้นี้" });
+      return res.status(400).json({ message: 'ไม่พบผู้ใช้นี้' });
     }
 
-    // ตรวจสอบ password โดยใช้ bcrypt
+    // ตรวจสอบ password
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
-      return res.status(401).json({ message: "รหัสผ่านไม่ถูกต้อง" });
+      return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
     }
 
+    // สร้าง payload สำหรับ JWT (ไม่ใส่ password)
     const payload = {
-        user:{
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-        }
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
+    // ตรวจสอบว่ามี secret กำหนดหรือไม่
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET ไม่ได้ตั้งค่าใน environment');
+      return res.status(500).json({ message: 'Server configuration error' });
     }
 
-    const token = jwt.sign(payload,process.env.JWT_SECRET,{
-        expiresIn: '1d'
-    })
+    // สร้าง token
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
-    res.json({
-        message: "เข้าสู่ระบบสำเร็จ",
-        user:payload.user,
-        token: token
-    })
-
-  } catch (err) {
-    console.error("Login Error:", err);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดในการเข้าสู่ระบบ" });
+    return res.json({
+      message: 'เข้าสู่ระบบสำเร็จ',
+      user: payload,
+      token,
+    });
+  } catch (error) {
+    console.error('Login Error:', error);
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' });
   }
 };

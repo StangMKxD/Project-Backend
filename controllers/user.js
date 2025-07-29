@@ -1,86 +1,147 @@
-const prisma = require("../prisma/prisma");
+const prisma = require('../prisma/prisma');
+const { updateCar } = require('./admin');
 
-exports.list = async (req, res) => {
+// แก้ไข profile ของตัวเอง (เฉพาะ name, email)
+exports.updateProfile = async (req, res) => {
+  const userId = req.user.id;
+  const { name, surname, email, password, phone } = req.body;
+
+const updateData = {};
+if (name) updateData.name = name;
+if (surname) updateData.surname = surname;
+if (email) updateData.email = email;
+if (password) updateData.password = password;
+if (phone) updateData.phone = phone;
+
+const updatedUser = await prisma.user.update({
+  where: { id: userId },
+  data: updateData,
+  select: { id: true, name: true, surname: true, email: true, phone: true },
+});
+
+res.json(updateCar)
+}
+// จองรถทดลองขับ
+exports.createBooking = async (req, res) => {
+  const userId = req.user.id;
+  const { carId, date } = req.body;
+
   try {
-
-    // if (isNaN(Number(userId))) {
-    //   return res.status(400).json({ message: 'Invalid user ID' });
-    // }
-
-    const user = await prisma.user.findMany({})
-
-    // if (!user) {
-    //   return res.status(404).json({ message: "User not found" });
-    // }
-
-    res.json(user);
-  } catch (err) {
-    console.error("Profile error:", err);
-    res.status(500).json({ message: "Server error" });
+    const booking = await prisma.booking.create({
+      data: { userId, carId, date: new Date(date) },
+    });
+    res.json(booking);
+  } catch (error) {
+    res.status(500).json({ message: "จองไม่สำเร็จ" });
   }
 };
 
-exports.update = async (req, res) => {
+// เพิ่มรถโปรด
+exports.addFavoriteCar = async (req, res) => {
+  const userId = req.user.id;
+  const { carId } = req.body;
+
+  if (!carId) {
+    return res.status(400).json({ message: "carId จำเป็น" })
+  }
+
   try {
-    const { userId } = req.params;
-    const { name, surname, email, password, phone } = req.body;
-
-    // ตรวจสอบว่าผู้ใช้มีอยู่จริงไหม
-    const existingUser = await prisma.user.findUnique({
-      where: { id: Number(userId) },
+    // เช็คว่ามีรถโปรดนี้แล้วหรือยัง
+    const existing = await prisma.favouriteCar.findFirst({
+      where: { userId, carId },
     });
+    if (existing)
+      return res.status(400).json({ message: "เพิ่มในรายการโปรดคุณแล้ว" });
 
-    if (!existingUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    const bcrypt = require("bcrypt");
-const hashedPassword = await bcrypt.hash(password, 10);
+    const favourite = await prisma.favouriteCar.create({
+      data: { userId, carId },
+    });
+    res.json(favourite);
+  } catch (error) {
+    res.status(500).json({ message: "เพิ่มล้มเหลว" });
+  }
+};
 
-    // อัปเดตข้อมูล
-    const updatedUser = await prisma.user.update({
-      where: { id: Number(userId) },
-      data: {
-        name,
-        surname,
-        email,
-        password: hashedPassword,
-        phone,
+// ลบ favorite car
+exports.removeFavoriteCar = async (req, res) => {
+  const userId = req.user.id;
+  const carId = parseInt(req.params.carId, 10);
+
+  if (!carId) {
+    return res.status(400).json({ message: "carId จำเป็น" });
+  }
+
+  try {
+    await prisma.favouriteCar.deleteMany({
+      where: { userId, carId },
+    });
+    res.json({ message: "ลบรายการโปรดสำเร็จ" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "ลบรายการโปรดล้มเหลว" });
+  }
+};
+
+// ดู favoritecar
+exports.getFavoriteCar = async (req, res) => {
+  const userId = req.user.id
+  try {
+    const favorites = await prisma.favouriteCar.findMany({
+      where: { userId},
+      include: {
+        car: true
       },
+    })
+    res.json(favorites.map((fav) => fav.car))
+  } catch (error) {
+    console.error("Fetch favorite error:", error)
+    res.status(500).json({message: "เกิดข้อผิดพลาด"})
+  }
+}
+
+// เพิ่มเปรียบเทียบรถ
+exports.addCompareCar = async (req, res) => {
+  const userId = req.user.id;
+  const { carAId, carBId } = req.body;
+
+  try {
+    const compare = await prisma.compareCar.create({
+      data: { userId, carAId, carBId },
     });
+    res.json(compare);
+  } catch (error) {
+    res.status(500).json({ message: "ระบบผิดพลาด" });
+  }
+};
+
+// ดูโปรไฟล์ตัวเอง
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        name: true,
+        surname: true,  
+        phone: true,    
+        email: true,
+        role: true
+      }
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: "ไม่พบผู้ใช้" })
+    }
 
     res.json({
-      message: "User updated successfully",
-      user: updatedUser,
-    });
-  } catch (err) {
-    console.error("Update error:", err);
-    res.status(500).json({ message: "Update failed" });
-  }
-};
-
-exports.remove = async(req, res) => {
-  try {
-    // ดึง id ของรถยนต์ที่ต้องการลบจากพารามิเตอร์ใน URL
-    const { userId } = req.params
-// ตรวจสอบว่า id ที่ได้มาเป็น ตัวเลขหรือไม่
-    if (isNaN(Number(userId))) {
-    return res.status(400).json({ message: 'Invalid User ID' });
-  }
-//   เช็คว่ามีรถยนต์ที่มี id ตรงนี้อยู่ในฐานข้อมูลหรือไม่
-  const existingUser = await prisma.user.findUnique({
-    where: { id: Number(userId) },
-  });
-
-  if (!existingUser) {
-    return res.status(404).json({ message: 'User not found' });
-  }
-// ทำการลบรถยนต์ที่มี id ตรงกับพารามิเตอร์
-    const remove = await prisma.user.delete({
-        where: { id: Number(userId) },
+      message: "โหลดข้อมูลโปรไฟล์สำเร็จ",
+      user: user,
     })
-    res.json({ message: "Delete Successfully", remove})
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Server Error " });
+    console.error("Profile Error:", err)
+    res.status(500).json({ message: "เกิดข้อผิดพลาด" })
   }
-};
+}
+
+
+

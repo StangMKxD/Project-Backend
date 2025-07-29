@@ -1,28 +1,57 @@
 const jwt = require("jsonwebtoken");
 
-exports.auth = (req, res, next) => {
-    try {
-        const token = req.header("x-auth-token")
+const JWT_SECRET = process.env.JWT_SECRET;
 
-        if(!token){
-            return res.status(401).json({
-                message: "No token bye bye"
-            })
-        }
-        const verifyToken = jwt.verify(token, process.env.JWT_SECRET,(err, decode) => {
-            if(err){
-                return res.status(401).json({ message: "Token is not invalid"})
-            } else {
-                console.log(decode)
-                req.user = decode
-                // console.log('token', verifyToken)
-                next()
-            }
-        })
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader)
+    return res.status(401).json({ message: "Token is required" });
 
-        
-    } catch (err) {
-        console.log('Somthing Wrong in Middleware')
-        res.status(500).json({ message: "Server Error"})
-    }
+  const token = authHeader.split(" ")[1];
+  if (!token)
+    return res.status(401).json({ message: "Token is required" });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: "Invalid token" });
+    req.user = user; // {id, email, role}
+    next();
+  });
 }
+
+function authorizeRole(role) {
+  return (req, res, next) => {
+    if (req.user.role !== role) {
+      return res.status(403).json({ message: "Forbidden: Insufficient rights" });
+    }
+    next();
+  };
+}
+
+module.exports = { authenticateToken, authorizeRole };
+
+
+// exports.auth = (req, res, next) => {
+//   const authHeader = req.headers.authorization;
+
+//   if (!authHeader) {
+//     return res.status(401).json({ message: "ไม่มี Token" });
+//   }
+
+//   const token = authHeader.split(" ")[1]; // Bearer tokenstring
+
+//   if (!token) {
+//     return res.status(401).json({ message: "ไม่มี Token" });
+//   }
+
+//   try {
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//     if (!decoded.user) {
+//       return res.status(401).json({ message: "Token ผิดรูปแบบ" });
+//     }
+
+//     req.user = decoded.user;
+//     next();
+//   } catch (err) {
+//     return res.status(401).json({ message: "Token ผิด" });
+//   }
+// };

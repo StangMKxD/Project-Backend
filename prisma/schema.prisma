@@ -14,17 +14,86 @@ datasource db {
 }
 
 model User {
-  id Int @id @default(autoincrement())
-  name String 
-  surname String
-  email String @unique
-  password String
-  phone String @unique
-  role Role @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            Int            @id @default(autoincrement())
+  name          String
+  surname       String
+  email         String         @unique
+  password      String
+  phone         String         @unique @db.VarChar(10)
+  role          Role           @default(USER)
+  favouriteCars FavouriteCar[]
+  bookings      Booking[]
+  compareCars   CompareCar[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
+
+model Car {
+  id            Int            @id @default(autoincrement())
+  brand         String
+  model         String
+  year          Int
+  fuel          String
+  price         Int
+  transmission  String
+  images    Image[]
+  detail        String?        @db.VarChar(1000)
+  type          Type
+  favouriteCars FavouriteCar[]
+  bookings      Booking[]
+  compareCarsA  CompareCar[]   @relation("carA")
+  compareCarsB  CompareCar[]   @relation("carB")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model FavouriteCar {
+  id        Int      @id @default(autoincrement())
+  carId     Int
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  car       Car      @relation(fields: [carId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, carId])
+}
+
+model Booking {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  carId     Int
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  car       Car      @relation(fields: [carId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model CompareCar {
+  id        Int      @id @default(autoincrement())
+  carAId    Int
+  carBId    Int
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  carA      Car      @relation("carA", fields: [carAId], references: [id])
+  carB      Car      @relation("carB", fields: [carBId], references: [id])
+  createdAt DateTime @default(now())
+}
+
 enum Role {
   ADMIN
   USER
+}
+
+enum Type {
+  SEDAN
+  SUV
+  PICKUP
+  HEV
+}
+
+model Image {
+  id     Int    @id @default(autoincrement())
+  url    String
+  carId  Int
+  car    Car   @relation(fields: [carId], references: [id], onDelete: Cascade)
 }
