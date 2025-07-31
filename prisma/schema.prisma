@@ -63,6 +63,7 @@ model Booking {
   date      DateTime
   carId     Int
   userId    Int
+  status    BookingStatus @default(PENDING)
   user      User     @relation(fields: [userId], references: [id])
   car       Car      @relation(fields: [carId], references: [id])
   createdAt DateTime @default(now())
@@ -96,4 +97,10 @@ model Image {
   url    String
   carId  Int
   car    Car   @relation(fields: [carId], references: [id], onDelete: Cascade)
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

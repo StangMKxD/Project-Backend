@@ -64,8 +64,8 @@ exports.register = async (req, res) => {
       message: 'สมัครสมาชิกสำเร็จแล้วเข้าสู่ระบบเลย',
       user,
     });
-  } catch (error) {
-    console.error('สมัครสมาชิกไม่สำเร็จ', error);
+  } catch (err) {
+    console.error('สมัครสมาชิกไม่สำเร็จ', err);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดที่ server' });
   }
 };
@@ -116,8 +116,8 @@ exports.login = async (req, res) => {
       user: payload,
       token,
     });
-  } catch (error) {
-    console.error('Login Error:', error);
+  } catch (err) {
+    console.error('Login Error:', err);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' });
   }
 };

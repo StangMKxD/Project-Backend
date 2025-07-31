@@ -6,7 +6,10 @@ const cors = require('cors')
 require('dotenv').config();
 
 app.use(morgan('dev'))
-app.use(cors())
+app.use(cors({
+  origin: "http://localhost:3000",
+  credentials: true     
+}))
 app.use(express.json())
 readdirSync('./routers').map((r) => {
   console.log("📦 โหลด route:", r); 

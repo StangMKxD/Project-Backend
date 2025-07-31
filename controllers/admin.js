@@ -1,14 +1,14 @@
 const prisma = require('../prisma/prisma');
 
 // ดูlist user
-exports.list = async (req, res) => {
+exports.userList = async (req, res) => {
     try {
         const user = await prisma.user.findMany({
             orderBy: { createdAt: 'desc' }
         });
         res.json({ user })
     } catch (err) {
-        console.error(err)
+        console.error("userlist",err)
         res.status(500).json({ message: "โหลดผู้ใช้ไม่สำเร็จ"})
     }
 }
@@ -28,17 +28,14 @@ exports.deleteUser = async (req, res) => {
       where: { userId },
     });
 
-    // ลบข้อมูลอื่น ๆ ที่เกี่ยวข้องกับ user
-
-    // ลบ user
     const deleted = await prisma.user.delete({
       where: { id: userId },
     });
 
     res.json({ deleted });
-  } catch (error) {
-    console.error(error);
-    if (error.code === 'P2003') {
+  } catch (err) {
+    console.error("deleteuser",err);
+    if (err.code === 'P2003') {
       return res.status(400).json({ message: "ไม่สามารถลบผู้ใช้ได้ เนื่องจากข้อมูลที่เกี่ยวข้องยังมีอยู่" });
     }
     res.status(500).json({ message: "ลบผู้ใช้ล้มเหลว" });
@@ -78,12 +75,11 @@ exports.createCar = async (req, res) => {
     });
 
     res.status(201).json({ message: "สร้างรถสำเร็จ", car: newCar });
-  } catch (error) {
-    console.error("สร้างรถไม่สำเร็จ:", error);
+  } catch (err) {
+    console.error("cretecar", err);
     res.status(500).json({ message: "สร้างรถไม่สำเร็จ" });
   }
 };
-
 
 // แก้ไขรถ
 exports.updateCar = async (req, res) => {
@@ -97,14 +93,13 @@ exports.updateCar = async (req, res) => {
       data: { brand, model, year, fuel, price, transmission, imageUrl, detail, type },
     });
     res.json(car);
-  } catch (error) {
+  } catch (err) {
+    console.error("updatecar", err)
     res.status(404).json({ message: "ไม่เจอรถที่จะแก้ไข" });
   }
 };
 
 // ลบรถ
-
-
 exports.deleteCar = async (req, res) => {
   const id = Number(req.params.id);
   try {
@@ -144,8 +139,8 @@ exports.deleteCar = async (req, res) => {
     });
 
     res.json({ message: "ลบรถสำเร็จ", deleted: car });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error("deletecar",err);
     res.status(500).json({ message: "เกิดข้อผิดพลาดขณะลบรถ", error: error.message });
   }
 };
@@ -159,7 +154,66 @@ exports.getAllCars = async (req, res) => {
       }
     });
     res.json(cars);
-  } catch (error) {
+  } catch (err) {
+    console.error("getallcars", err)
     res.status(500).json({ message: "Fetch ข้อมูลรถล้มเหลว" });
+  }
+};
+
+// ดึงรถเฉพาะ ไอดี
+exports.getCar = async (req, res) => {
+  const carId = Number(req.params.id);
+
+  try {
+    const car = await prisma.car.findUnique({
+      where: { id: carId },
+      include: {
+        images: true, 
+      },
+    });
+
+    if (!car) {
+      return res.status(404).json({ message: "ไม่พบรถยนต์คันนี้" });
+    }
+
+    res.json(car);
+  } catch (err) {
+    console.error("getcar", err);
+    res.status(500).json({ message: "เกิดข้อผิดพลาด" });
+  }
+};
+
+// ดู ข้อมูลการจองทดลองขับ
+exports.getAllBookings = async (req, res) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      where: { status: "PENDING" },
+      include: {
+        user: true,
+        car: true,
+      },
+    });
+    res.json(bookings);
+  } catch (err) {
+    console.error("getallbookings",err);
+    res.status(500).json({ message: "ดึงข้อมูลไม่สำเร็จ" });
+  }
+};
+
+// รออนุมัติการจอง
+exports.updateBookingStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; 
+
+  try {
+    const updated = await prisma.booking.update({
+      where: { id: parseInt(id) },
+      data: { status },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("updatebookingstatus",err);
+    res.status(500).json({ message: "อัปเดตสถานะไม่สำเร็จ" });
   }
 };
