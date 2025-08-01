@@ -45,9 +45,8 @@ exports.deleteUser = async (req, res) => {
 // เพิ่มรถ
 exports.createCar = async (req, res) => {
   const { brand, model, year, fuel, price, transmission, detail, type } = req.body;
-  const files = req.files; // multer upload.array("images", 10)
+  const files = req.files; 
 
-  // Validate required fields
   if (!brand) return res.status(400).json({ message: "กรุณากรอกยี่ห้อรถ (brand)" });
   if (!year || isNaN(parseInt(year))) return res.status(400).json({ message: "กรุณากรอกปีรถให้ถูกต้อง" });
   if (!price || isNaN(parseInt(price))) return res.status(400).json({ message: "กรุณากรอกราคารถให้ถูกต้อง" });

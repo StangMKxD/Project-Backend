@@ -196,84 +196,82 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// add เปรียบเทียบรถ
-exports.addCompare = async (req, res) => {
-  const { carAId, carBId } = req.body
-  const userId = req.user.id
+exports.getCompare = async (req, res) => {
+  const userId = req.user.id;
 
-  try {
-    const existing = await prisma.compareCar.findFirst({
-      where: {
-        userId,
-        carAId,
-        carBId
-      }
-    })
+  const compare = await prisma.compareCar.findUnique({
+    where: { userId },
+    include: {
+      carA: {
+        include: {
+          images: true,  // เพิ่มตรงนี้
+        },
+      },
+      carB: {
+        include: {
+          images: true,  // เพิ่มตรงนี้
+        },
+      },
+    },
+  });
 
-    if (existing) {
-      return res.status(400).json({ message: "โปรดเลือกรถคันอื่น" })
-    }
+  res.json(compare || { carA: null, carB: null });
+};
 
-    if (carAId === carBId) {
-  return res.status(400).json({ message: "ไม่สามารถเปรียบเทียบรถคันเดียวกันได้" });
-}
+// เพิ่มหรือ toggle คันรถ
+exports.toggleCompare = async (req, res) => {
+  const userId = req.user.id;
+  const { carId } = req.body;
 
-    const compare = await prisma.compareCar.create({
-      data: {
-        userId,
-        carAId,
-        carBId
-      }
-    })
+  let compare = await prisma.compareCar.findUnique({ where: { userId } });
 
-    res.json(compare)
-  } catch (err) {
-    console.error("addcompare", err)
-    res.status(500).json({ message: "เกิดข้อผิดพลาด" })
-  }
-}
-
-//ลบ compare
-exports.removeCompare = async (req, res) => {
-  const { id } = req.params
-  const userId = req.user.id
-
-  try {
-    const compare = await prisma.compareCar.findUnique({
-      where: { id: Number(id) }
-    })
-
-    if (!compare || compare.userId !== userId) {
-      return res.status(403).json({ message: "ไม่สามารถลบได้" })
-    }
-
-    await prisma.compareCar.delete({ 
-      where: { id: Number(id) }
-    })
-
-    res.json({ message: "ลบเรียบร้อยแล้ว" })
-  } catch (err) {
-    console.error("removecompare", err)
-    res.status(500).json({ message: "เกิดข้แผิดพลาด" })
-  }
-}
-
-//ดูหน้าการเปรียบเทียบรถ
-exports.getCompareUser = async (req, res) => {
-  const userId = req.user.id
-
-  try {
-    const compare = await prisma.compareCar.findMany({
+  if (!compare) {
+    compare = await prisma.compareCar.create({
+      data: { userId, carAId: carId },
+    });
+    // ส่งข้อมูลพร้อม images
+    const newCompare = await prisma.compareCar.findUnique({
       where: { userId },
       include: {
-        carA: true,
-        carB: true
-      }
-    })
-
-    res.json(compare)
-  } catch (err) {
-    console.error("getcompareuser", err)
-    res.status(500).json({ message: "เกิดข้อผิดพลาด"})
+        carA: { include: { images: true } },
+        carB: { include: { images: true } },
+      },
+    });
+    return res.json(newCompare);
   }
-}
+
+  // ถ้ามีอยู่แล้วใน carA หรือ carB
+  if (compare.carAId === carId) {
+    await prisma.compareCar.update({
+      where: { userId },
+      data: { carAId: null },
+    });
+  } else if (compare.carBId === carId) {
+    await prisma.compareCar.update({
+      where: { userId },
+      data: { carBId: null },
+    });
+  } else if (!compare.carAId) {
+    await prisma.compareCar.update({
+      where: { userId },
+      data: { carAId: carId },
+    });
+  } else if (!compare.carBId) {
+    await prisma.compareCar.update({
+      where: { userId },
+      data: { carBId: carId },
+    });
+  } else {
+    return res.status(400).json({ message: "สามารถเปรียบเทียบได้สูงสุด 2 คัน" });
+  }
+
+  const updated = await prisma.compareCar.findUnique({
+    where: { userId },
+    include: {
+      carA: { include: { images: true } },
+      carB: { include: { images: true } },
+    },
+  });
+
+  res.json(updated);
+};

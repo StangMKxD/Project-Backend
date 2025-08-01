@@ -71,13 +71,14 @@ model Booking {
 
 model CompareCar {
   id        Int      @id @default(autoincrement())
-  carAId    Int
-  carBId    Int
+  carAId    Int?
+  carBId    Int?
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
-  carA      Car      @relation("carA", fields: [carAId], references: [id])
-  carB      Car      @relation("carB", fields: [carBId], references: [id])
+  carA      Car?     @relation("carA", fields: [carAId], references: [id])
+  carB      Car?      @relation("carB", fields: [carBId], references: [id])
   createdAt DateTime @default(now())
+  @@unique([userId])
 }
 
 enum Role {

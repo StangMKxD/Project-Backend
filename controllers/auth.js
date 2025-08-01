@@ -1,6 +1,7 @@
 const prisma = require('../prisma/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cron = require('node-cron')
 
 exports.register = async (req, res) => {
   try {
@@ -121,3 +122,38 @@ exports.login = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' });
   }
 };
+
+exports.startBookingCleanupJob = () => {
+  // รันทุกวันตอนเที่ยงคืน
+  cron.schedule("0 0 * * *", async () => {
+    console.log("⏰ Running booking cleanup job...");
+
+    const today = new Date();
+
+    try {
+      // ลบ APPROVED ที่วัน <= วันนี้
+      const approvedDeleted = await prisma.booking.deleteMany({
+        where: {
+          status: "APPROVED",
+          date: {
+            lte: today,
+          },
+        },
+      });
+
+      // ลบ REJECTED ทั้งหมด
+      const rejectedDeleted = await prisma.booking.deleteMany({
+        where: {
+          status: "REJECTED",
+        },
+      });
+
+      console.log(`✅ Deleted ${approvedDeleted.count} APPROVED bookings`);
+      console.log(`🗑️ Deleted ${rejectedDeleted.count} REJECTED bookings`);
+    } catch (error) {
+      console.error("🔥 Error in cleanup job:", error);
+    }
+  });
+};
+
+

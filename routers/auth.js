@@ -20,9 +20,8 @@ routerz.get("/cars/:id", admin.getCar)
 routerz.use(authenticateToken);
 
 // User Role
-routerz.post("/user/comparecar", authenticateToken, user.addCompare)
-routerz.get("/user/comparecar/", authenticateToken, user.getCompareUser)
-routerz.delete("/user/comparecar/:id", authenticateToken, user.removeCompare)
+routerz.get("/user/comparecar/", authenticateToken, user.getCompare)
+routerz.post("/user/comparecar/", authenticateToken, user.toggleCompare)
 
 routerz.get("/user/profile",authenticateToken, user.getProfile)
 routerz.put("/user/updateprofile",authenticateToken, user.updateProfile)
